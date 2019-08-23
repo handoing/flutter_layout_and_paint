@@ -54,45 +54,49 @@ Widget myCustomButton = MaterialApp(
   ),
 );
 
-Widget myMultipleTestWidget = MyRow(
-  children: <Widget>[
-    MySub(
-      child: MyRow(
-        children: <Widget>[
-          MySub(
-            child: Container(
-              width: 80,
-              height: 80,
-              color: Colors.red,
-              child: MyCenter(
-                child: Text('1'),
+Widget myMultipleTestWidget = MaterialApp(
+  home: Scaffold(
+    body: MyRow(
+      children: <Widget>[
+        MySub(
+          child: MyRow(
+            children: <Widget>[
+              MySub(
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  color: Colors.red,
+                  child: MyCenter(
+                    child: Text('1', style: TextStyle(fontSize: 24),),
+                  ),
+                ),
               ),
-            ),
-          ),
-          MySub(
-            child: Container(
-              width: 80,
-              height: 80,
-              color: Colors.green,
-              child: MyCenter(
-                child: Text('2'),
+              MySub(
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  color: Colors.green,
+                  child: MyCenter(
+                    child: Text('2', style: TextStyle(fontSize: 24),),
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    ),
-    MySub(
-      child: Container(
-        width: 100,
-        height: 100,
-        color: Colors.green,
-        child: MyCenter(
-          child: Text('3'),
         ),
-      ),
+        MySub(
+          child: Container(
+            width: 100,
+            height: 100,
+            color: Colors.green,
+            child: MyCenter(
+              child: Text('3', style: TextStyle(fontSize: 24),),
+            ),
+          ),
+        ),
+      ],
     ),
-  ],
+  ),
 );
 
-void main() => runApp(myCustomButton);
+void main() => runApp(mySingleWidget);
