@@ -39,7 +39,7 @@ class _MyButtonState extends State<MyButton> with SingleTickerProviderStateMixin
   Tween<double> radiusTween;
   Animation<double> radiusAnimation;
   AnimationStatus status;
-  Offset _tapPosition;
+  Offset tapPosition;
 
   @override
   void initState() {
@@ -66,7 +66,7 @@ class _MyButtonState extends State<MyButton> with SingleTickerProviderStateMixin
 
     final RenderBox renderBox = context.findRenderObject();
 
-    _tapPosition = renderBox.globalToLocal(tapDetails.globalPosition);
+    tapPosition = renderBox.globalToLocal(tapDetails.globalPosition);
     _animate();
 
     widget.onTap();
@@ -82,7 +82,7 @@ class _MyButtonState extends State<MyButton> with SingleTickerProviderStateMixin
         options: Options(
           radius: radiusAnimation.value,
           status: status,
-          tapPosition: _tapPosition,
+          tapPosition: tapPosition,
           color: widget.color,
         )
     );
