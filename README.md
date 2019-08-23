@@ -478,7 +478,13 @@ class RenderMyBtn extends RenderProxyBox {
 
 #### 问题：重布局和重绘？
 
+1.当某个节点的size变了，整个视图树需要重新计算？
 
+通过设置relayoutBoundary，使得边界内的Widget做任何改变都不会导致边界外的节点重新布局。
+
+2.如何避免重绘？
+
+通过RepaintBoundary组件或直接设置renderObject的isRepaintBoundary
 
 
 
