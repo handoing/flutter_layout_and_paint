@@ -486,6 +486,9 @@ class RenderMyBtn extends RenderProxyBox {
 
 通过RepaintBoundary组件或直接设置renderObject的isRepaintBoundary
 
+#### demo
+
+[https://github.com/handoing/flutter_layout_and_paint](https://github.com/handoing/flutter_layout_and_paint)
 
 
 
