@@ -4,7 +4,7 @@
 
 先来看下flutter rendering pipeline，如图：
 <img src="http://p0.qhimg.com/t014b88997d0c84c319.png" width="100%" /> 
-当flutter接收到系统发送来的Vsync信号时，会连续执行动画、构建、布局、绘制一系列操作，最后输出Sence传递给flutter engine进行后续操作，其中绿色部分是本次要讲的内容。
+当flutter接收到系统发送来的Vsync信号时，会连续执行动画、构建、布局、绘制一系列操作，最后输出Sence（layer tree）并传递给flutter engine进行后续操作，其中绿色部分是本次要讲的内容，这里说明一下，在flutter里，layout和paint阶段操作的是RenderObject tree。
 
 ### 实现流程
 
@@ -19,11 +19,11 @@ mixin RendererBinding on BindingBase, ServicesBinding, SchedulerBinding, Gesture
   @protected
   void drawFrame() {
     // PipelineOwner负责管理renderObject tree的渲染
-    pipelineOwner.flushLayout();
-    pipelineOwner.flushCompositingBits();
-    pipelineOwner.flushPaint();
-    renderView.compositeFrame();
-    pipelineOwner.flushSemantics();
+    pipelineOwner.flushLayout(); // 对RenderObject进行布局操作
+    pipelineOwner.flushCompositingBits(); // 对layer tree做相关处理
+    pipelineOwner.flushPaint(); // 对RenderObject进行绘制操作
+    renderView.compositeFrame(); // 传递sence给engine做后续操作
+    pipelineOwner.flushSemantics(); // 处理语义相关操作
   }
   ...
 }
@@ -46,7 +46,7 @@ void flushLayout() {
 }
 ```
 
-_layoutWithoutResize 方法里执行performLayout，并调用markNeedsPaint标记节点状态。
+_layoutWithoutResize 方法里执行performLayout，并调用markNeedsPaint标记节点dirty状态。
 
 ```dart
 void _layoutWithoutResize() {
@@ -133,7 +133,7 @@ void _paintWithContext(PaintingContext context, Offset offset) {
 
 flutter里面有两种约束类型：
 
-1.BoxConstraint
+1.BoxConstraint（盒约束）
 
 ```dart
 const BoxConstraints({
@@ -149,7 +149,7 @@ Size(double width, double height)
 ```
 
 
-2.SliverConstraint
+2.SliverConstraint（滚动相关约束）
 
 ```dart
 const SliverConstraints({
@@ -187,6 +187,8 @@ const SliverGeometry({
 ### 自定义布局和绘制示例：
 
 1.单Widget
+
+实现简单居中布局，截屏如图：
 <div align="center">
 <img src="http://p0.qhimg.com/t01bae4861bbef9063b.png" width="400px"/>
 </div>
@@ -195,7 +197,7 @@ const SliverGeometry({
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-
+// 继承SingleChildRenderObjectWidget并重写createRenderObject方法，返回自定义的RenderMyCenter
 class MyCenter extends SingleChildRenderObjectWidget {
 
   MyCenter({Widget child}): super(child: child);
@@ -206,13 +208,15 @@ class MyCenter extends SingleChildRenderObjectWidget {
   }
 }
 
+// 继承RenderShiftedBox并重写performLayout实现布局，RenderShiftedBox最终继承自RenderObject
 class RenderMyCenter extends RenderShiftedBox {
   RenderMyCenter(): super(null);
 
   @override
   void performLayout() {
 
-    this.child.layout(
+	// 通过调用child的layout方法向子节点传递约束
+    child.layout(
         BoxConstraints(
             minHeight: 0.0,
             maxHeight: this.constraints.minHeight,
@@ -222,21 +226,26 @@ class RenderMyCenter extends RenderShiftedBox {
         parentUsesSize: true
     );
 
-    final BoxParentData childParentData = this.child.parentData;
-    childParentData.offset = Offset((this.constraints.maxWidth - this.child.size.width) / 2, (this.constraints.maxHeight - this.child.size.height) / 2);
+    final BoxParentData childParentData = child.parentData;
+    // 设置偏移量，使child居中
+    childParentData.offset = Offset((constraints.maxWidth - child.size.width) / 2, (constraints.maxHeight - child.size.height) / 2);
 
-    this.size = Size(this.constraints.maxWidth, this.constraints.maxHeight);
+	// 设置大小，使得其父元素可以拿到当前节点的size
+    size = Size(constraints.maxWidth, constraints.maxHeight);
   }
 
 }
 ```
 
 2.多Widget
+
+实现简单横向布局Widget，定义两个子Widget，截屏如图：
 <div align="center">
 <img src="http://p0.qhimg.com/t018d4d7209c11a2581.png" width="400px" />
 </div>
 
 ```dart
+// 实现多Widget需继承MultiChildRenderObjectWidget，重写createRenderObject
 class MyRow extends MultiChildRenderObjectWidget {
   MyRow({
     Key key,
@@ -249,6 +258,7 @@ class MyRow extends MultiChildRenderObjectWidget {
   }
 }
 
+// 定义MyMultiChildLayoutParentData，当RenderMyRow mixins时需传入当前类型
 class MyMultiChildLayoutParentData extends ContainerBoxParentData<RenderBox> {
   @override
   String toString() => '${super.toString()};';
@@ -259,7 +269,7 @@ class MySub extends ParentDataWidget<MyRow> {
 
   @override
   void applyParentData(RenderObject renderObject) {
-
+	// 可通过applyParentData对renderObject进行一些赋值操作，以便布局中可通过ParentData拿到相关信息，本示例未用到
   }
 
 }
@@ -279,7 +289,9 @@ class RenderMyRow extends RenderBox with ContainerRenderObjectMixin<RenderBox, M
 
   @override
   void performLayout() {
+  	// 拿到第一个子节点
     RenderBox child = firstChild;
+    // 传递约束
     child.layout(BoxConstraints(
       minHeight: 0.0,
       maxHeight: constraints.maxHeight,
@@ -287,9 +299,12 @@ class RenderMyRow extends RenderBox with ContainerRenderObjectMixin<RenderBox, M
       maxWidth: constraints.maxWidth / 2,
     ), parentUsesSize: true);
     MyMultiChildLayoutParentData childParentData = child.parentData;
+    // 定义偏移使其水平居左，垂直居中
     childParentData.offset = Offset(0, (constraints.maxHeight - child.size.height) / 2);
 
+	// 通过nextSibling拿到第二个子节点
     child = childParentData.nextSibling;
+    // 传递约束
     child.layout(BoxConstraints(
       minHeight: 0.0,
       maxHeight: constraints.maxHeight,
@@ -297,8 +312,10 @@ class RenderMyRow extends RenderBox with ContainerRenderObjectMixin<RenderBox, M
       maxWidth: constraints.maxWidth / 2,
     ), parentUsesSize: true);
     childParentData = child.parentData;
+    // 定义偏移使其水平居右，垂直居中
     childParentData.offset = Offset(constraints.maxWidth - child.size.width, (constraints.maxHeight - child.size.height) / 2);
 
+	// 定义大小
     size = Size(constraints.maxWidth, constraints.maxHeight);
 
   }
@@ -308,6 +325,7 @@ class RenderMyRow extends RenderBox with ContainerRenderObjectMixin<RenderBox, M
     RenderBox child = firstChild;
     while (child != null) {
       final MyMultiChildLayoutParentData childParentData = child.parentData;
+      // 直接交由子元素绘制
       context.paintChild(child, childParentData.offset + offset);
       child = childParentData.nextSibling;
     }
@@ -316,6 +334,8 @@ class RenderMyRow extends RenderBox with ContainerRenderObjectMixin<RenderBox, M
 ```
 
 3.自定义Button
+
+自定义button，当被点击触发圆圈扩散动画
 <div align="center">
 <img src="http://p0.qhimg.com/t015c363517765f10c6.gif" width="400px" />
 </div>
@@ -415,6 +435,7 @@ class _MyButtonState extends State<MyButton> with SingleTickerProviderStateMixin
   }
 }
 
+// 继承SingleChildRenderObjectWidget
 class MyBtn extends SingleChildRenderObjectWidget {
 
   MyBtn({
@@ -433,12 +454,14 @@ class MyBtn extends SingleChildRenderObjectWidget {
 
   @override
   void updateRenderObject(BuildContext context, RenderMyBtn renderObject) {
+  	// 重新赋值options
     renderObject
       ..options = options;
   }
 
 }
 
+// 继承RenderProxyBox
 class RenderMyBtn extends RenderProxyBox {
 
   RenderMyBtn({
@@ -450,6 +473,7 @@ class RenderMyBtn extends RenderProxyBox {
   Options _options;
   set options(Options value) {
     _options = value;
+    // 当options被赋值时标记当前节点需要绘制
     markNeedsPaint();
   }
 
@@ -465,9 +489,11 @@ class RenderMyBtn extends RenderProxyBox {
     Canvas canvas = context.canvas;
 
     canvas.translate(offset.dx, offset.dy);
+    // 绘制边框
     canvas.drawRect(Rect.fromLTWH(0, 0, child.size.width, child.size.height), paint);
 
     if (_options.status == AnimationStatus.forward) {
+    	// 绘制圆
       canvas.drawCircle(_options.tapPosition, _options.radius, paint);
     }
 
@@ -478,10 +504,16 @@ class RenderMyBtn extends RenderProxyBox {
 
 #### 问题：重布局和重绘？
 
+1.当某个节点的size变了，整个视图树需要重新计算？
 
+通过设置relayoutBoundary，使得边界内的节点做任何改变都不会导致边界外的节点重新布局。
 
+2.如何避免图层内其他节点重绘？
 
+通过RepaintBoundary组件或直接设置renderObject的isRepaintBoundary为true
 
+有兴趣的同学可自行验证
 
+#### demo
 
-
+[https://github.com/handoing/flutter_layout_and_paint](https://github.com/handoing/flutter_layout_and_paint)
